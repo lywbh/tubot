@@ -1,5 +1,8 @@
 package com.kamimi.tubot.utils;
 
+import lombok.SneakyThrows;
+
+import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -13,6 +16,7 @@ public class HttpUtils {
             .followRedirects(HttpClient.Redirect.NORMAL)
             .build();
 
+    @SneakyThrows
     public static String get(String url) {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
@@ -23,7 +27,19 @@ public class HttpUtils {
             throw new IllegalStateException("HTTP返回码异常：" + response.statusCode());
         }
         return response.body();
+    }
 
+    @SneakyThrows
+    public static InputStream getStream(String url) {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .timeout(Duration.ofMillis(5000))
+                .build();
+        HttpResponse<InputStream> response = client.send(request, HttpResponse.BodyHandlers.ofInputStream());
+        if (response.statusCode() != 200) {
+            throw new IllegalStateException("HTTP返回码异常：" + response.statusCode());
+        }
+        return response.body();
     }
 
 }
