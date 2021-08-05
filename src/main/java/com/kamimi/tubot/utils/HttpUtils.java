@@ -15,7 +15,7 @@ public class HttpUtils {
     private static final HttpClient client = HttpClient.newBuilder()
             .connectTimeout(Duration.ofMillis(10000))
             .followRedirects(HttpClient.Redirect.NORMAL)
-            .proxy(ProxyConfig.DEFAULT_PROXY)
+            .proxy(ProxyConfig.HTTP_PROXY)
             .build();
 
     public static String get(String url) {
