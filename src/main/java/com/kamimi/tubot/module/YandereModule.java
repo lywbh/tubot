@@ -15,7 +15,7 @@ public class YandereModule {
         UNKNOWN, SAFE, QUESTIONABLE, EXPLICIT
     }
 
-    public Rating rating(String rating) {
+    public static Rating rating(String rating) {
         rating = rating.trim();
         switch (rating) {
             case "s":
@@ -32,19 +32,19 @@ public class YandereModule {
         }
     }
 
-    public String randomPic() {
+    public static String randomPic() {
         return randomPic(Rating.SAFE, null);
     }
 
-    public String randomPic(Rating rating) {
+    public static String randomPic(Rating rating) {
         return randomPic(rating, null);
     }
 
-    public String randomPic(Rating rating, String tags) {
+    public static String randomPic(Rating rating, String tags) {
         return randomPic(rating, tags, 100);
     }
 
-    private String randomPic(Rating rating, String tags, int bound) {
+    private static String randomPic(Rating rating, String tags, int bound) {
         if (bound == 0) {
             return null;
         }
