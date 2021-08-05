@@ -1,25 +1,22 @@
 package com.kamimi.tubot;
 
-import com.kamimi.tubot.config.PushConfig;
 import com.kamimi.tubot.config.ThreadPoolConfig;
 import com.kamimi.tubot.module.SaucenaoModule;
 import com.kamimi.tubot.module.YandereModule;
 import com.kamimi.tubot.obj.CommandInfo;
 import com.kamimi.tubot.utils.HttpUtils;
 import com.kamimi.tubot.utils.LogUtils;
+import net.mamoe.mirai.Bot;
 import net.mamoe.mirai.console.plugin.jvm.JavaPlugin;
 import net.mamoe.mirai.console.plugin.jvm.JvmPluginDescriptionBuilder;
 import net.mamoe.mirai.contact.Contact;
 import net.mamoe.mirai.contact.Group;
 import net.mamoe.mirai.event.GlobalEventChannel;
-import net.mamoe.mirai.event.events.BotOfflineEvent;
-import net.mamoe.mirai.event.events.BotOnlineEvent;
 import net.mamoe.mirai.event.events.GroupMessageEvent;
 import net.mamoe.mirai.message.data.*;
 
 import java.io.InputStream;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -42,8 +39,6 @@ public final class JavaPluginMain extends JavaPlugin {
         LogUtils.init(getLogger());
         // 监听群消息
         subscribeGroup();
-        // 开启推送
-        settlePush();
     }
 
     private static final HashBasedTable<Long, Long, String> commandHolder = HashBasedTable.create();
@@ -102,6 +97,45 @@ public final class JavaPluginMain extends JavaPlugin {
                                 .build();
                         g.getGroup().sendMessage(messageChain);
                         break;
+                    case "!push":
+                        boolean isOn;
+                        long gapMinutes;
+                        if (commandInfo.getParams().isEmpty()) {
+                            g.getGroup().sendMessage("命令有误，请检查");
+                            return;
+                        } else if (commandInfo.getParams().size() == 1) {
+                            if ("on".equals(commandInfo.getParams().get(0))) {
+                                isOn = true;
+                            } else if ("off".equals(commandInfo.getParams().get(0))) {
+                                isOn = false;
+                            } else {
+                                g.getGroup().sendMessage("命令有误，请检查");
+                                return;
+                            }
+                            gapMinutes = 30;
+                        } else {
+                            if ("on".equals(commandInfo.getParams().get(0))) {
+                                isOn = true;
+                            } else if ("off".equals(commandInfo.getParams().get(0))) {
+                                isOn = false;
+                            } else {
+                                g.getGroup().sendMessage("命令有误，请检查");
+                                return;
+                            }
+                            try {
+                                gapMinutes = Long.parseLong(commandInfo.getParams().get(1));
+                            } catch (NumberFormatException e) {
+                                g.getGroup().sendMessage("命令有误，请检查");
+                                return;
+                            }
+                        }
+                        if (isOn) {
+                            setPushTask(g.getBot(), g.getGroup().getId(), gapMinutes);
+                            g.getGroup().sendMessage("群推送已开启，推送间隔" + gapMinutes + "min");
+                        } else {
+                            delPushTask(g.getBot(), g.getGroup().getId());
+                            g.getGroup().sendMessage("群推送已关闭");
+                        }
                     default:
                         break;
                 }
@@ -109,29 +143,29 @@ public final class JavaPluginMain extends JavaPlugin {
         });
     }
 
-    private static final Map<Long, ScheduledFuture<?>> taskHolder = new ConcurrentHashMap<>();
+    private static final HashBasedTable<Long, Long, ScheduledFuture<?>> taskHolder = HashBasedTable.create();
 
-    private void settlePush() {
-        GlobalEventChannel.INSTANCE.parentScope(this).subscribeAlways(BotOnlineEvent.class, b -> {
-            ScheduledFuture<?> task = ThreadPoolConfig.SCHEDULED_POOL.scheduleAtFixedRate(() -> {
-                String sUrl = YandereModule.randomPic(YandereModule.Rating.SAFE);
-                InputStream sStream = HttpUtils.getStream(sUrl);
-                String qUrl = YandereModule.randomPic(YandereModule.Rating.QUESTIONABLE);
-                InputStream qStream = HttpUtils.getStream(qUrl);
-                PushConfig.PUSH_GROUPS.forEach(groupId -> {
-                    Group group = b.getBot().getGroup(groupId);
-                    if (group != null) {
-                        Contact.sendImage(group, sStream);
-                        Contact.sendImage(group, qStream);
-                    }
-                });
-            }, PushConfig.PUSH_PER_MINUTES, PushConfig.PUSH_PER_MINUTES, TimeUnit.MINUTES);
-            taskHolder.put(b.getBot().getId(), task);
-        });
-        GlobalEventChannel.INSTANCE.parentScope(this).subscribeAlways(BotOfflineEvent.class, b -> {
-            taskHolder.get(b.getBot().getId()).cancel(false);
-            taskHolder.remove(b.getBot().getId());
-        });
+    private void setPushTask(Bot bot, long groupId, long gapMinutes) {
+        ScheduledFuture<?> task = ThreadPoolConfig.SCHEDULED_POOL.scheduleAtFixedRate(() -> {
+            String sUrl = YandereModule.randomPic(YandereModule.Rating.SAFE);
+            InputStream sStream = HttpUtils.getStream(sUrl);
+            String qUrl = YandereModule.randomPic(YandereModule.Rating.QUESTIONABLE);
+            InputStream qStream = HttpUtils.getStream(qUrl);
+            Group group = bot.getGroup(groupId);
+            if (group != null) {
+                Contact.sendImage(group, sStream);
+                Contact.sendImage(group, qStream);
+            }
+        }, gapMinutes, gapMinutes, TimeUnit.MINUTES);
+        taskHolder.put(bot.getId(), groupId, task);
+    }
+
+    private void delPushTask(Bot bot, long groupId) {
+        ScheduledFuture<?> task = taskHolder.get(bot.getId(), groupId);
+        if (task != null) {
+            task.cancel(false);
+            taskHolder.remove(bot.getId(), groupId);
+        }
     }
 
 }
