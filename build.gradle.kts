@@ -17,6 +17,7 @@ repositories {
 
 dependencies {
     implementation("com.alibaba:fastjson:1.2.76")
+    implementation("com.google.guava:guava:30.1.1-jre")
     implementation("org.projectlombok:lombok:1.18.20")
     annotationProcessor("org.projectlombok:lombok:1.18.20")
 }
