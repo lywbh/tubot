@@ -6,7 +6,10 @@ import com.alibaba.fastjson.JSONObject;
 import com.kamimi.tubot.utils.HttpUtils;
 import com.kamimi.tubot.utils.RandomUtils;
 
-public class KonachanModule {
+/**
+ * yandere图库
+ */
+public class YandereModule {
 
     public enum Rating {
         UNKNOWN, SAFE, QUESTIONABLE, EXPLICIT
@@ -37,10 +40,6 @@ public class KonachanModule {
         return randomPic(rating, null);
     }
 
-    public String randomPic(String tags) {
-        return randomPic(Rating.SAFE, tags);
-    }
-
     public String randomPic(Rating rating, String tags) {
         return randomPic(rating, tags, 100);
     }
@@ -57,7 +56,7 @@ public class KonachanModule {
         }
         int page = RandomUtils.getRandomInt(bound) + 1;
 
-        String url = String.format("http://konachan.net/post.json?limit=100&page=%d&tags=%s%%20rating:%s", page, tags, rating.name().toLowerCase());
+        String url = String.format("https://yande.re/post.json?limit=100&page=%d&tags=%s%%20rating:%s", page, tags, rating.name().toLowerCase());
         String response = HttpUtils.get(url);
         JSONArray respArray = JSON.parseArray(response);
         if (respArray.isEmpty()) {
