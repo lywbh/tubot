@@ -2,6 +2,7 @@ package com.kamimi.tubot;
 
 import com.kamimi.tubot.config.ThreadPoolConfig;
 import com.kamimi.tubot.module.LoliconModule;
+import com.kamimi.tubot.module.PetpetModule;
 import com.kamimi.tubot.module.SaucenaoModule;
 import com.kamimi.tubot.obj.CommandInfo;
 import com.kamimi.tubot.utils.HttpUtils;
@@ -15,6 +16,7 @@ import net.mamoe.mirai.event.GlobalEventChannel;
 import net.mamoe.mirai.event.events.GroupMessageEvent;
 import net.mamoe.mirai.message.data.*;
 
+import java.io.File;
 import java.io.InputStream;
 import java.util.Map;
 import java.util.concurrent.ScheduledFuture;
@@ -49,82 +51,81 @@ public final class JavaPluginMain extends JavaPlugin {
             if (lastCommand != null) {
                 // 间接命令
                 commandHolder.remove(g.getGroup().getId(), g.getSender().getId());
-                switch (lastCommand) {
-                    case "!source":
-                        for (SingleMessage element : g.getMessage()) {
-                            if (element instanceof Image) {
-                                String imgUrl = Image.queryUrl((Image) element);
-                                LogUtils.getLogger().info("imgUrl:" + imgUrl);
-                                Map<String, String> bestMatch = SaucenaoModule.bestMatch(imgUrl);
-                                if (!bestMatch.isEmpty()) {
-                                    StringBuilder sb = new StringBuilder();
-                                    bestMatch.forEach((k, v) -> sb.append(k).append(" --> ").append(v).append("\n"));
-                                    g.getGroup().sendMessage(sb.toString());
-                                } else {
-                                    g.getGroup().sendMessage("没有找到出处哟");
-                                }
-                                break;
+                if ("!source".equals(lastCommand)) {
+                    for (SingleMessage element : g.getMessage()) {
+                        if (element instanceof Image) {
+                            String imgUrl = Image.queryUrl((Image) element);
+                            LogUtils.getLogger().info("imgUrl:" + imgUrl);
+                            Map<String, String> bestMatch = SaucenaoModule.bestMatch(imgUrl);
+                            if (!bestMatch.isEmpty()) {
+                                StringBuilder sb = new StringBuilder();
+                                bestMatch.forEach((k, v) -> sb.append(k).append(" --> ").append(v).append("\n"));
+                                g.getGroup().sendMessage(sb.toString());
+                            } else {
+                                g.getGroup().sendMessage("没有找到出处哟");
                             }
+                            break;
                         }
-                        break;
-                    default:
-                        break;
+                    }
                 }
             } else {
                 // 直接命令
                 CommandInfo commandInfo = CommandInfo.fromString(g.getMessage().contentToString());
-                switch (commandInfo.getCommand()) {
-                    case "!source":
-                        commandHolder.put(g.getGroup().getId(), g.getSender().getId(), "!source");
-                        MessageChain messageChain = new MessageChainBuilder()
-                                .append(new At(g.getSender().getId()))
-                                .append(" 请发送要查询的图片")
-                                .build();
-                        g.getGroup().sendMessage(messageChain);
-                        break;
-                    case "!push":
-                        boolean isOn;
-                        long gapMinutes;
-                        if (commandInfo.getParams().isEmpty()) {
+                if (g.getMessage().contentToString().startsWith("摸")) {
+                    for (SingleMessage message : g.getMessage()) {
+                        if (message instanceof At) {
+                            String gifPath = PetpetModule.petpet(((At) message).getTarget());
+                            Contact.sendImage(g.getGroup(), new File(gifPath));
+                        }
+                    }
+                } else if ("!source".equals(commandInfo.getCommand())) {
+                    commandHolder.put(g.getGroup().getId(), g.getSender().getId(), "!source");
+                    MessageChain messageChain = new MessageChainBuilder()
+                            .append(new At(g.getSender().getId()))
+                            .append(" 请发送要查询的图片")
+                            .build();
+                    g.getGroup().sendMessage(messageChain);
+                } else if ("!push".equals(commandInfo.getCommand())) {
+                    boolean isOn;
+                    long gapMinutes;
+                    if (commandInfo.getParams().isEmpty()) {
+                        g.getGroup().sendMessage("命令有误，请检查");
+                        return;
+                    } else {
+                        if ("on".equals(commandInfo.getParams().get(0))) {
+                            isOn = true;
+                        } else if ("off".equals(commandInfo.getParams().get(0))) {
+                            isOn = false;
+                        } else {
                             g.getGroup().sendMessage("命令有误，请检查");
                             return;
+                        }
+                        if (commandInfo.getParams().size() == 1) {
+                            gapMinutes = 30;
                         } else {
-                            if ("on".equals(commandInfo.getParams().get(0))) {
-                                isOn = true;
-                            } else if ("off".equals(commandInfo.getParams().get(0))) {
-                                isOn = false;
-                            } else {
+                            try {
+                                gapMinutes = Long.parseLong(commandInfo.getParams().get(1));
+                            } catch (NumberFormatException e) {
                                 g.getGroup().sendMessage("命令有误，请检查");
                                 return;
                             }
-                            if (commandInfo.getParams().size() == 1) {
-                                gapMinutes = 30;
-                            } else {
-                                try {
-                                    gapMinutes = Long.parseLong(commandInfo.getParams().get(1));
-                                } catch (NumberFormatException e) {
-                                    g.getGroup().sendMessage("命令有误，请检查");
-                                    return;
-                                }
-                            }
                         }
-                        String responseMsg;
-                        if (isOn) {
-                            if (setPushTask(g.getBot(), g.getGroup(), gapMinutes)) {
-                                responseMsg = "群推送已开启，推送间隔" + gapMinutes + "min";
-                            } else {
-                                responseMsg = "推送已经在开启状态了";
-                            }
+                    }
+                    String responseMsg;
+                    if (isOn) {
+                        if (setPushTask(g.getBot(), g.getGroup(), gapMinutes)) {
+                            responseMsg = "群推送已开启，推送间隔" + gapMinutes + "min";
                         } else {
-                            if (delPushTask(g.getBot(), g.getGroup())) {
-                                responseMsg = "群推送已关闭";
-                            } else {
-                                responseMsg = "还没开启推送哦，您是要开启推送吗？请使用!push on命令";
-                            }
+                            responseMsg = "推送已经在开启状态了";
                         }
-                        g.getGroup().sendMessage(responseMsg);
-                    default:
-                        break;
+                    } else {
+                        if (delPushTask(g.getBot(), g.getGroup())) {
+                            responseMsg = "群推送已关闭";
+                        } else {
+                            responseMsg = "还没开启推送哦，您是要开启推送吗？请使用!push on命令";
+                        }
+                    }
+                    g.getGroup().sendMessage(responseMsg);
                 }
             }
         });
