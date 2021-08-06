@@ -1,8 +1,8 @@
 package com.kamimi.tubot;
 
 import com.kamimi.tubot.config.ThreadPoolConfig;
+import com.kamimi.tubot.module.LoliconModule;
 import com.kamimi.tubot.module.SaucenaoModule;
-import com.kamimi.tubot.module.YandereModule;
 import com.kamimi.tubot.obj.CommandInfo;
 import com.kamimi.tubot.utils.HttpUtils;
 import com.kamimi.tubot.utils.LogUtils;
@@ -74,21 +74,6 @@ public final class JavaPluginMain extends JavaPlugin {
                 // 直接命令
                 CommandInfo commandInfo = CommandInfo.fromString(g.getMessage().contentToString());
                 switch (commandInfo.getCommand()) {
-                    case "!pic":
-                        String imgUrl;
-                        if (commandInfo.getParams().isEmpty()) {
-                            imgUrl = YandereModule.randomPic();
-                        } else if (commandInfo.getParams().size() == 1) {
-                            YandereModule.Rating rating = YandereModule.rating(commandInfo.getParams().get(0));
-                            imgUrl = YandereModule.randomPic(rating);
-                        } else {
-                            YandereModule.Rating rating = YandereModule.rating(commandInfo.getParams().get(0));
-                            String tag = commandInfo.getParams().get(1);
-                            imgUrl = YandereModule.randomPic(rating, tag);
-                        }
-                        InputStream imgStream = HttpUtils.getStream(imgUrl);
-                        Contact.sendImage(g.getGroup(), imgStream);
-                        break;
                     case "!source":
                         commandHolder.put(g.getGroup().getId(), g.getSender().getId(), "!source");
                         MessageChain messageChain = new MessageChainBuilder()
@@ -103,16 +88,6 @@ public final class JavaPluginMain extends JavaPlugin {
                         if (commandInfo.getParams().isEmpty()) {
                             g.getGroup().sendMessage("命令有误，请检查");
                             return;
-                        } else if (commandInfo.getParams().size() == 1) {
-                            if ("on".equals(commandInfo.getParams().get(0))) {
-                                isOn = true;
-                            } else if ("off".equals(commandInfo.getParams().get(0))) {
-                                isOn = false;
-                            } else {
-                                g.getGroup().sendMessage("命令有误，请检查");
-                                return;
-                            }
-                            gapMinutes = 30;
                         } else {
                             if ("on".equals(commandInfo.getParams().get(0))) {
                                 isOn = true;
@@ -122,20 +97,32 @@ public final class JavaPluginMain extends JavaPlugin {
                                 g.getGroup().sendMessage("命令有误，请检查");
                                 return;
                             }
-                            try {
-                                gapMinutes = Long.parseLong(commandInfo.getParams().get(1));
-                            } catch (NumberFormatException e) {
-                                g.getGroup().sendMessage("命令有误，请检查");
-                                return;
+                            if (commandInfo.getParams().size() == 1) {
+                                gapMinutes = 30;
+                            } else {
+                                try {
+                                    gapMinutes = Long.parseLong(commandInfo.getParams().get(1));
+                                } catch (NumberFormatException e) {
+                                    g.getGroup().sendMessage("命令有误，请检查");
+                                    return;
+                                }
                             }
                         }
+                        String responseMsg;
                         if (isOn) {
-                            setPushTask(g.getBot(), g.getGroup().getId(), gapMinutes);
-                            g.getGroup().sendMessage("群推送已开启，推送间隔" + gapMinutes + "min");
+                            if (setPushTask(g.getBot(), g.getGroup(), gapMinutes)) {
+                                responseMsg = "群推送已开启，推送间隔" + gapMinutes + "min";
+                            } else {
+                                responseMsg = "推送已经在开启状态了";
+                            }
                         } else {
-                            delPushTask(g.getBot(), g.getGroup().getId());
-                            g.getGroup().sendMessage("群推送已关闭");
+                            if (delPushTask(g.getBot(), g.getGroup())) {
+                                responseMsg = "群推送已关闭";
+                            } else {
+                                responseMsg = "还没开启推送哦，您是要开启推送吗？请使用!push on命令";
+                            }
                         }
+                        g.getGroup().sendMessage(responseMsg);
                     default:
                         break;
                 }
@@ -145,27 +132,30 @@ public final class JavaPluginMain extends JavaPlugin {
 
     private static final HashBasedTable<Long, Long, ScheduledFuture<?>> taskHolder = HashBasedTable.create();
 
-    private void setPushTask(Bot bot, long groupId, long gapMinutes) {
+    private boolean setPushTask(Bot bot, Group group, long gapMinutes) {
+        if (taskHolder.contains(bot.getId(), group.getId())) {
+            return false;
+        }
         ScheduledFuture<?> task = ThreadPoolConfig.SCHEDULED_POOL.scheduleAtFixedRate(() -> {
-            String sUrl = YandereModule.randomPic(YandereModule.Rating.SAFE);
+            String sUrl = LoliconModule.randomPic(LoliconModule.Rating.MIX);
             InputStream sStream = HttpUtils.getStream(sUrl);
-            String qUrl = YandereModule.randomPic(YandereModule.Rating.QUESTIONABLE);
+            String qUrl = LoliconModule.randomPic(LoliconModule.Rating.R18);
             InputStream qStream = HttpUtils.getStream(qUrl);
-            Group group = bot.getGroup(groupId);
-            if (group != null) {
-                Contact.sendImage(group, sStream);
-                Contact.sendImage(group, qStream);
-            }
+            Contact.sendImage(group, sStream);
+            Contact.sendImage(group, qStream);
         }, gapMinutes, gapMinutes, TimeUnit.MINUTES);
-        taskHolder.put(bot.getId(), groupId, task);
+        taskHolder.put(bot.getId(), group.getId(), task);
+        return true;
     }
 
-    private void delPushTask(Bot bot, long groupId) {
-        ScheduledFuture<?> task = taskHolder.get(bot.getId(), groupId);
-        if (task != null) {
-            task.cancel(false);
-            taskHolder.remove(bot.getId(), groupId);
+    private boolean delPushTask(Bot bot, Group group) {
+        ScheduledFuture<?> task = taskHolder.get(bot.getId(), group.getId());
+        if (task == null) {
+            return false;
         }
+        task.cancel(false);
+        taskHolder.remove(bot.getId(), group.getId());
+        return true;
     }
 
 }

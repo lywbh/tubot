@@ -15,9 +15,4 @@ public class ProxyConfig {
     private static final int PORT = 10809;
     public static final ProxySelector HTTP_PROXY = ProxySelector.of(new InetSocketAddress(HOST, PORT));
 
-    /**
-     * 系统代理
-     */
-    public static final ProxySelector DEFAULT_PROXY = ProxySelector.getDefault();
-
 }

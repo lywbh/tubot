@@ -1,7 +1,5 @@
 package com.kamimi.tubot.utils;
 
-import com.kamimi.tubot.config.ProxyConfig;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.*;
@@ -15,7 +13,6 @@ public class HttpUtils {
     private static final HttpClient client = HttpClient.newBuilder()
             .connectTimeout(Duration.ofMillis(10000))
             .followRedirects(HttpClient.Redirect.NORMAL)
-            .proxy(ProxyConfig.HTTP_PROXY)
             .build();
 
     public static String get(String url) {
